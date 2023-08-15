@@ -1,136 +1,86 @@
+#define  _POSIX_C_SOURCE 200809L
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "monty.h"
+
+void file_error(char *argv);
+void error_usage(void);
+int status = 0;		/* global var declaration */
 
 /**
  * main - entry point
- * @argc: number of argument
- * @argv: arguments
- * Description: entry point for stack options and execution
- * Return: 0
+ * @argv: list of arguments passed to our program
+ * @argc: amount of args
+ *
+ * Return: nothing
  */
-
 int main(int argc, char **argv)
 {
+	FILE *file;
+	size_t buf_len = 0;
+	char *buffer = NULL;
+	char *str = NULL;
 	stack_t *stack = NULL;
-	instruction_t pair[] = {
-		{"push", _push}, {"queue", _queue},
-		{"pall", _pall}, {"stack", _stack},
-		{"pint", _pint}, {"pop", _pop},
-		{"swap", _swap}, {"add", _add},
-		{"mul", _mul}, {"sub", _sub},
-		{"div", _div}, {"mod", _mod},
-		{"nop", _nop}, {"pchar", _pchar},
-		{"pstr", _pstr}, {"rotl", _rotl},
-		{"rotr", _rotr},
-		{NULL, NULL}
-	};
-	FILE *m;
+	unsigned int line_cnt = 1;
 
+	global.data_struct = 1;  /* struct defined in monty.h L58*/
 	if (argc != 2)
+		error_usage(); /* def in line 82 */
+
+	file = fopen(argv[1], "r");
+
+	if (!file)
+		file_error(argv[1]);  /* def in line 68 */
+
+	while ((getline(&buffer, &buf_len, file)) != (-1))
 	{
-		fprintf(stderr, "USAGE: monty file\n");
-		exit(EXIT_FAILURE);
-	}
-	m = fopen(argv[1], "r");
-	if (m == NULL)
-	{
-		fprintf(stderr, "Error: Can't open file %s\n", argv[1]);
-		exit(EXIT_FAILURE);
-	}
-
-	read_parse_exec(m, pair, &stack);
-
-	fclose(m);
-	clean_up(&stack);
-
-	return (0);
-}
-
-/**
- * clean_up - clean up stack after file is closed
- * @stack: content on stack
- */
-void clean_up(stack_t **stack)
-{
-	while (*stack != NULL)
-	{
-		stack_t *tmp = *stack;
-
-		*stack = (*stack)->next;
-		free(tmp);
-	}
-}
-
-/**
- * read_parse_exec - execute fuction
- * @file: file to read from
- * @pair: opcode and function
- * @stack: top of stack
- * Description: reads from giving file, search for function pair in pair[]
- * and executes
- */
-void read_parse_exec(FILE *file, instruction_t *pair, stack_t **stack)
-{
-	char inpt[NUM];
-	unsigned int line_number = 1;
-
-	while (fgets(inpt, sizeof(inpt), file))
-	{
-		char *opcode_tok;
-		int size;
-
-		if (inpt[0] == '#')
+		if (status)
+			break;
+		if (*buffer == '\n')
+		{
+			line_cnt++;
 			continue;
-
-		size = strlen(inpt);
-		if (size > 0 && inpt[size - 1] == '\n')
-			inpt[size - 1] = '\0';
-
-		opcode_tok = strtok(inpt, " $\n");
-		if (opcode_tok != NULL)
-		{
-			instruction_t *start = pair;
-
-			while (start->opcode != NULL)
-			{
-				if (strcmp(start->opcode, opcode_tok) == 0)
-				{
-					start->f(stack, line_number);
-					break;
-				}
-				start++;
-			}
-			if (start->opcode == NULL)
-			{
-				fprintf(stderr, "L%d: unknown instruction %s\n", line_number, opcode_tok);
-				exit(EXIT_FAILURE);
-			}
 		}
-		line_number++;
+		str = strtok(buffer, " \t\n");
+		if (!str || *str == '#')
+		{
+			line_cnt++;
+			continue;
+		}
+		global.argument = strtok(NULL, " \t\n");
+		opcode(&stack, str, line_cnt);
+		line_cnt++;
 	}
+	free(buffer);
+	free_stack(stack);
+	fclose(file);
+	exit(EXIT_SUCCESS);
 }
 
 /**
- * countArg_checkDig - count argument and checck f it is a digi
- * @count_args: argument
- * Return: int
+ * file_error - prints file error message and exits
+ * @argv: argv given by main()
+ *
+ * Desc: print msg if  not possible to open the file
+ * Return: nothing
  */
-int countArg_checkDig(char *count_args, unsigned int line_number)
+void file_error(char *argv)
 {
-	int val, i;
+	fprintf(stderr, "Error: Can't open file %s\n", argv);
+	exit(EXIT_FAILURE);
+}
 
-	if (count_args == NULL)
-	{
-		fprintf(stderr, "L%d: usage: push integer\n", line_number);
-		exit(EXIT_FAILURE);
-	}
-	for (i = 0; count_args[i] != '\0'; i++)
-	{
-		if (!isdigit(count_args[i]) && count_args[i] != '-')
-		{
-			fprintf(stderr, "L%d: usage: push integer\n", line_number);
-			exit(EXIT_FAILURE);
-		}
-	}
-	val = atoi(count_args);
-	return (val);
+/**
+ * error_usage - prints usage message and exits
+ *
+ * Desc: if user does not give any file or more than
+ * one argument to your program
+ *
+ * Return: nothing
+ */
+void error_usage(void)
+{
+	fprintf(stderr, "USAGE: monty file\n");
+	exit(EXIT_FAILURE);
 }
